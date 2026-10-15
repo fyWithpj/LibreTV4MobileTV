@@ -1,0 +1,14 @@
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/.env*
+**/*.apk
+**/*.idsig
+**/*.jks
+**/*.keystore
+**/*.m3u
+**/*.m3u8
+**/standalone-api.js
+**/standalone-defaults.json
