@@ -1,0 +1,14 @@
+/* TV应用样式覆盖 */
+#app {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    text-align: left !important;
+  }
+  
+  body {
+    place-items: normal !important;
+    min-width: 100% !important;
+    width: 100% !important;
+  }
