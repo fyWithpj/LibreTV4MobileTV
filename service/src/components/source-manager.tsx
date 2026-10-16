@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from './drawer';
 import { ConfirmDialog } from './confirm-dialog';
 import { Icon, type IconName } from './icon';
@@ -155,9 +155,12 @@ function TabRow<T extends string>({
   variant: 'primary' | 'secondary';
   ariaLabel: string;
 }) {
+  const buttonRefs = useRef(new Map<T, HTMLButtonElement>());
   const move = (dir: 1 | -1) => {
     const idx = tabs.findIndex((t) => t.id === value);
-    onChange(tabs[(idx + dir + tabs.length) % tabs.length].id);
+    const next = tabs[(idx + dir + tabs.length) % tabs.length];
+    onChange(next.id);
+    requestAnimationFrame(() => buttonRefs.current.get(next.id)?.focus());
   };
   return (
     <div
@@ -171,6 +174,17 @@ function TabRow<T extends string>({
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
           move(-1);
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          const dialog = e.currentTarget.closest('[role="dialog"]');
+          const rows = dialog ? Array.from(dialog.querySelectorAll<HTMLElement>('[role="tablist"]')) : [];
+          const rowIndex = rows.indexOf(e.currentTarget);
+          const nextRow = e.key === 'ArrowDown' ? rows[rowIndex + 1] : rows[rowIndex - 1];
+          const target = nextRow?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+            ?? (e.key === 'ArrowDown'
+              ? dialog?.querySelector<HTMLElement>('[data-drawer-content] a[href], [data-drawer-content] button:not([disabled]), [data-drawer-content] input:not([disabled]), [data-drawer-content] textarea:not([disabled]), [data-drawer-content] select:not([disabled]), [data-drawer-content] [tabindex]:not([tabindex="-1"])')
+              : dialog?.querySelector<HTMLElement>('[aria-label="关闭"]'));
+          e.preventDefault();
+          target?.focus();
         }
       }}
     >
@@ -179,11 +193,16 @@ function TabRow<T extends string>({
         return (
           <button
             key={t.id}
+            ref={(node) => {
+              if (node) buttonRefs.current.set(t.id, node);
+              else buttonRefs.current.delete(t.id);
+            }}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             className={cn(
               // 两级导航都等宽撑满一行（原先二级按内容宽度、超宽才横滚，与一级不一致）
-              'flex-1 min-w-0 inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md transition-colors',
+              'flex-1 min-w-0 inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:z-10',
               variant === 'primary'
                 ? cn(
                     'px-2 py-1.5 text-xs',

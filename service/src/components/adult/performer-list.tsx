@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '@/components/auth';
 import { useAppStore } from '@/lib/store';
 import { LivePlayer } from '@/components/live-player';
@@ -56,6 +56,7 @@ export default function AdultPerformerList({
   const [playerError, setPlayerError] = useState('');
   const [playerMode, setPlayerMode] = useState<'channels' | 'official'>('channels');
   const [reloadKey, setReloadKey] = useState(0);
+  const channelPanelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     try {
@@ -226,8 +227,29 @@ export default function AdultPerformerList({
         {configInvalid && <p className="text-xs text-warning">主播列表配置格式无效，当前显示示例卡片。</p>}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.6fr)] gap-5">
-        <section className="card p-4 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(13rem,0.8fr)_minmax(0,1.7fr)] gap-5 items-start">
+        <section
+          ref={channelPanelRef}
+          className="card flex h-[70vh] min-h-[22rem] max-h-[46rem] min-w-0 flex-col p-4"
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+            const target = event.target instanceof HTMLElement ? event.target : null;
+            const article = target?.closest('article');
+            const current = target?.closest<HTMLButtonElement>('[data-performer-select]')
+              ?? article?.querySelector<HTMLButtonElement>('[data-performer-select]')
+              ?? null;
+            const items = Array.from(channelPanelRef.current?.querySelectorAll<HTMLButtonElement>('[data-performer-select]') ?? []);
+            const index = current ? items.indexOf(current) : -1;
+            const nextIndex = index < 0
+              ? (event.key === 'ArrowDown' ? 0 : -1)
+              : index + (event.key === 'ArrowDown' ? 1 : -1);
+            const next = items[nextIndex];
+            if (!next) return;
+            event.preventDefault();
+            next.focus({ preventScroll: true });
+            next.scrollIntoView({ block: 'nearest' });
+          }}
+        >
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold text-content">直播频道 / 主播</h2>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setReloadKey((value) => value + 1)} disabled={loading}>
@@ -238,13 +260,13 @@ export default function AdultPerformerList({
           {!loading && filteredPerformers.length === 0 && (
             <p className="py-6 text-sm text-muted">{performers.length ? '没有匹配的主播' : '暂无主播数据'}</p>
           )}
-          <div className="space-y-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1 scrollbar-thin">
             {filteredPerformers.map((performer) => {
               const active = selectedId === performer.id;
               const isFavorite = favorites.includes(performer.id);
               return (
                 <article key={performer.id} className={'rounded-lg border p-3 flex items-center gap-2 ' + (active ? 'border-accent bg-hover' : 'border-line bg-card')}>
-                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setSelectedId(performer.id)}>
+                  <button type="button" data-performer-select className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" onClick={() => setSelectedId(performer.id)}>
                     <span className="block truncate font-medium text-content">{performer.name}</span>
                     <span className="mt-1 block text-xs text-muted">{performer.category}</span>
                     <span className="mt-2 inline-flex text-[11px] rounded-full px-2 py-0.5 bg-chip text-muted">
@@ -257,7 +279,7 @@ export default function AdultPerformerList({
                             : '在线示例'}
                     </span>
                   </button>
-                  <button type="button" className="p-2 rounded-md text-warning hover:bg-hover" aria-label={isFavorite ? '取消收藏' : '加入收藏'} onClick={() => toggleFavorite(performer.id)}>
+                  <button type="button" className="p-2 rounded-md text-warning hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" aria-label={isFavorite ? '取消收藏' : '加入收藏'} onClick={() => toggleFavorite(performer.id)}>
                     {isFavorite ? '★' : '☆'}
                   </button>
                 </article>

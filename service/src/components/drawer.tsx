@@ -86,8 +86,11 @@ export function Drawer({
     if (!mounted) return;
     const panel = panelRef.current;
     if (!panel) return;
+    // Settings tabs are the visible entry point. Starting on the close button
+    // makes the remote's first arrow presses feel detached from the highlighted tab.
+    const selectedTab = panel.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
     const first = panel.querySelector<HTMLElement>(FOCUSABLE);
-    (first ?? panel).focus();
+    (selectedTab ?? first ?? panel).focus();
   }, [mounted]);
 
   // Esc 关闭 + Tab 循环（焦点不逃逸到背景页面）
@@ -99,6 +102,47 @@ export function Drawer({
         if (document.querySelector('[role="alertdialog"]')) return;
         e.stopPropagation();
         onClose();
+        return;
+      }
+      if (e.defaultPrevented) return;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const current = document.activeElement;
+        if (!(current instanceof HTMLElement) || !panelRef.current?.contains(current)) return;
+        if (current.matches('input, textarea, select, [contenteditable="true"]')) return;
+
+        const currentRect = current.getBoundingClientRect();
+        const currentX = currentRect.left + currentRect.width / 2;
+        const currentY = currentRect.top + currentRect.height / 2;
+        let best: HTMLElement | null = null;
+        let bestScore = Number.POSITIVE_INFINITY;
+
+        for (const candidate of Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))) {
+          if (candidate === current || candidate.getClientRects().length === 0) continue;
+          const rect = candidate.getBoundingClientRect();
+          const x = rect.left + rect.width / 2;
+          const y = rect.top + rect.height / 2;
+          const primary = e.key === 'ArrowDown' ? y - currentY
+            : e.key === 'ArrowUp' ? currentY - y
+              : e.key === 'ArrowRight' ? x - currentX
+                : currentX - x;
+          if (primary <= 4) continue;
+          const cross = e.key === 'ArrowDown' || e.key === 'ArrowUp' ? Math.abs(x - currentX) : Math.abs(y - currentY);
+          const score = primary + cross * 1.5;
+          if (score < bestScore) {
+            best = candidate;
+            bestScore = score;
+          }
+        }
+
+        if (!best && e.key === 'ArrowUp') {
+          const rows = Array.from(panelRef.current.querySelectorAll<HTMLElement>('[role="tablist"]'));
+          best = rows[rows.length - 1]?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]') ?? null;
+        }
+        if (best) {
+          e.preventDefault();
+          best.focus({ preventScroll: true });
+          best.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
         return;
       }
       if (e.key !== 'Tab') return;
@@ -166,7 +210,7 @@ export function Drawer({
         </div>
         {subheader && <div className="shrink-0 px-4 py-2.5 border-b border-line bg-surface-raised">{subheader}</div>}
         {/* 唯一滚动区：内容再长也只在这一层滚动，避免与列表内滚形成嵌套滚动 */}
-        <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 pt-4 pb-6">
+        <div ref={contentRef} data-drawer-content className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 pt-4 pb-6">
           {children}
         </div>
       </div>
